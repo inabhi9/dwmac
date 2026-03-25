@@ -73,6 +73,7 @@ func runLightSession<T>(
             try await layoutWorkspaces()
             if focusBefore != focusAfter {
                 focusAfter?.nativeFocus() // syncFocusToMacOs
+                markNativeFocusExpected(focusAfter)
             }
             scheduleRefreshSession(event)
             return result
