@@ -27,7 +27,7 @@ struct Rect: ConvenienceCopyable, AeroAny {
 
 extension CGRect {
     func monitorFrameNormalized() -> Rect {
-        let mainMonitorHeight: CGFloat = mainMonitor.height
+        let mainMonitorHeight: CGFloat = physicalMainMonitor.height
         let rect = toRect()
         return rect.copy(\.topLeftY, mainMonitorHeight - rect.topLeftY)
     }

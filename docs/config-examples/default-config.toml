@@ -26,6 +26,14 @@ master-position = 'left'
 # Fallback value (if you omit the key): attach-below = false
 attach-below = false
 
+# When true, all attached monitors are treated as one big virtual display:
+#   - Dwmac no longer creates a workspace per physical monitor.
+#   - The active workspace spans every monitor (left-most to right-most,
+#     top-most to bottom-most), and the master window is placed in the
+#     top-left-most monitor so it can extend to the next monitor on the right.
+# Fallback value (if you omit the key): treat-multiple-monitors-as-one = false
+treat-multiple-monitors-as-one = false
+
 # Possible values: horizontal|vertical|auto
 # 'auto' means: wide monitor (anything wider than high) gets horizontal orientation,
 #               tall monitor (anything higher than wide) gets vertical orientation

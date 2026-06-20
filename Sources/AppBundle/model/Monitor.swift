@@ -14,6 +14,46 @@ extension MonitorImpl: Monitor {
     var width: CGFloat { rect.width }
 }
 
+/// A virtual monitor that spans the bounding box of multiple physical monitors.
+/// Used when ``Config/treatMultipleMonitorsAsOne`` is enabled so that a single
+/// workspace can extend across all attached displays.
+private struct CombinedMonitor: Monitor {
+    let monitorAppKitNsScreenScreensId: Int
+    let name: String
+    let rect: Rect
+    let visibleRect: Rect
+    let isMain: Bool
+    var height: CGFloat { rect.height }
+    var width: CGFloat { rect.width }
+}
+
+private func combineMonitors(_ underlying: [Monitor]) -> Monitor? {
+    guard let first = underlying.first else { return nil }
+    if underlying.count == 1 { return first }
+
+    func boundingBox(_ rects: [Rect]) -> Rect {
+        let minX = rects.map(\.minX).min() ?? 0
+        let minY = rects.map(\.minY).min() ?? 0
+        let maxX = rects.map(\.maxX).max() ?? 0
+        let maxY = rects.map(\.maxY).max() ?? 0
+        return Rect(topLeftX: minX, topLeftY: minY, width: maxX - minX, height: maxY - minY)
+    }
+
+    let rect = boundingBox(underlying.map(\.rect))
+    let visibleRect = boundingBox(underlying.map(\.visibleRect))
+    let mainId = underlying.first(where: \.isMain)?.monitorAppKitNsScreenScreensId
+        ?? first.monitorAppKitNsScreenScreensId
+    let name = "Combined (\(underlying.map(\.name).joined(separator: ", ")))"
+
+    return CombinedMonitor(
+        monitorAppKitNsScreenScreensId: mainId,
+        name: name,
+        rect: rect,
+        visibleRect: visibleRect,
+        isMain: true,
+    )
+}
+
 /// Use it instead of NSScreen because it can be mocked in tests
 protocol Monitor: AeroAny {
     /// The index in NSScreen.screens array. 1-based index
@@ -94,7 +134,25 @@ private let testMonitor = MonitorImpl(
     isMain: true,
 )
 
+/// Always returns the underlying physical screens, ignoring
+/// ``Config/treatMultipleMonitorsAsOne``. Use ``monitors`` for the
+/// "logical" view that respects the config.
+@MainActor
+var physicalMonitors: [Monitor] {
+    isUnitTest
+        ? [testMonitor]
+        : NSScreen.screens.enumerated().map { $0.element.toMonitor(monitorAppKitNsScreenScreensId: $0.offset + 1) }
+}
+
+@MainActor
 var mainMonitor: Monitor {
+    physicalMainMonitor
+}
+
+/// Always returns the underlying physical main monitor regardless of
+/// ``Config/treatMultipleMonitorsAsOne``. Used for coordinate
+/// normalization (see ``CGRect/monitorFrameNormalized``).
+nonisolated var physicalMainMonitor: Monitor {
     if isUnitTest { return testMonitor }
     let screens = NSScreen.screens
     // Fallback: If main screen can't be found (e.g., during display reconfiguration),
@@ -104,12 +162,16 @@ var mainMonitor: Monitor {
     return LazyMonitor(monitorAppKitNsScreenScreensId: screen.index + 1, isMain: true, screen.value)
 }
 
+@MainActor
 var monitors: [Monitor] {
-    isUnitTest
-        ? [testMonitor]
-        : NSScreen.screens.enumerated().map { $0.element.toMonitor(monitorAppKitNsScreenScreensId: $0.offset + 1) }
+    let physical = physicalMonitors
+    if config.treatMultipleMonitorsAsOne, let combined = combineMonitors(physical) {
+        return [combined]
+    }
+    return physical
 }
 
+@MainActor
 var sortedMonitors: [Monitor] {
     monitors.sortedBy([\.rect.minX, \.rect.minY])
 }

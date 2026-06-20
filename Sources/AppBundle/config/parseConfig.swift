@@ -103,6 +103,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
     "default-root-container-orientation": Parser(\.defaultRootContainerOrientation, parseDefaultContainerOrientation),
     "master-position": Parser(\.masterPosition, parseMasterPosition),
+    "treat-multiple-monitors-as-one": Parser(\.treatMultipleMonitorsAsOne, parseBool),
 
     "start-at-login": Parser(\.startAtLogin, parseBool),
     "automatically-unhide-macos-hidden-apps": Parser(\.automaticallyUnhideMacosHiddenApps, parseBool),

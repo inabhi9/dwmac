@@ -60,6 +60,7 @@ struct Config: ConvenienceCopyable {
     var onWindowDetected: [WindowDetectedCallback] = []
     var onModeChanged: [any Command] = []
     var masterPosition: MasterPosition = .left
+    var treatMultipleMonitorsAsOne: Bool = false
 }
 
 enum DefaultContainerOrientation: String {

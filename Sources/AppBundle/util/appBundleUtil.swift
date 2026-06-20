@@ -112,6 +112,7 @@ extension CGPoint {
         sqrt((x - point.x).squared + (y - point.y).squared)
     }
 
+    @MainActor
     var monitorApproximation: Monitor {
         let monitors = monitors
         return monitors.first(where: { $0.rect.contains(self) })
