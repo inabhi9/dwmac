@@ -22,6 +22,17 @@ default-mfact = 0.5
 # Default value: left
 master-position = 'left'
 
+# Maximum number of stacked (non-master) windows to tile in the master-stack layout.
+# -1 : unlimited, every stacked window is tiled (default behavior)
+#  0 : no stack, only the master is tiled and other windows are hidden off-screen
+#      (monocle-like); opening a new window becomes the master
+# >0 : limit the visible stack; windows beyond the limit are removed from the stack and
+#      hidden off-screen. With attach-below the new window stays visible at the bottom of
+#      the stack and pushes the topmost window out; otherwise the oldest window falls off
+#      the bottom.
+# Fallback value (if you omit the key): stack-windows-limit = -1
+stack-windows-limit = -1
+
 # Whether new windows should be attached to the master position (index 0) or the last position.
 # Fallback value (if you omit the key): attach-below = false
 attach-below = false

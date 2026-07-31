@@ -61,7 +61,7 @@ final class FocusCommandTest: XCTestCase {
         assertEquals(focus.windowOrNil?.windowId, 1)
     }
 
-    func testFocusFloatingWindows() async throws {
+    func testFocusNextPrevExcludesFloatingWindows() async throws {
         let workspace = Workspace.get(byName: name)
         _ = TestWindow.new(id: 1, parent: workspace)
         _ = TestWindow.new(id: 2, parent: workspace)
@@ -71,16 +71,15 @@ final class FocusCommandTest: XCTestCase {
         XCTAssertTrue(Window.get(byId: 1)?.focusWindow() == true)
         assertEquals(focus.windowOrNil?.windowId, 1)
 
+        // focus next/prev cycles only through the master + stack (tiling) windows; the
+        // floating window (id 3) is excluded from the cycle.
         try await FocusCommand.new(relative: .next).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 2)
-
-        try await FocusCommand.new(relative: .next).run(.defaultEnv, .emptyStdin)
-        assertEquals(focus.windowOrNil?.windowId, 3) // This is the floating window
 
         var args = FocusCmdArgs(rawArgs: [], nextPrev: .next)
         args.rawBoundariesAction = .wrapAroundTheWorkspace
         try await FocusCommand(args: args).run(.defaultEnv, .emptyStdin)
-        assertEquals(focus.windowOrNil?.windowId, 1) // Wrap around
+        assertEquals(focus.windowOrNil?.windowId, 1) // wraps back to master, skipping floating id 3
     }
 
     func testFocusRelativeWrapping() async throws {

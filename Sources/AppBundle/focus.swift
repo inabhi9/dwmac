@@ -76,13 +76,18 @@ struct FrozenFocus: AeroAny, Equatable, Sendable {
 }
 extension Window {
     @MainActor func focusWindow() -> Bool {
-        if let focus = toLiveFocusOrNil() {
-            return setFocus(to: focus)
-        } else {
+        guard let liveFocus = toLiveFocusOrNil() else {
             // todo We should also exit-native-hidden/unminimize[/exit-native-fullscreen?] window if we want to fix ID-B6E178F2
             //      and retry to focus the window. Otherwise, it's not possible to focus minimized/hidden windows
             return false
         }
+        let result = setFocus(to: liveFocus)
+        // Explicitly focusing a window hidden by `stack-windows-limit` brings it into view.
+        // This runs *after* setFocus so the window counts as focused while `revealStackWindow`
+        // re-applies the limit (the focused window is never hidden). Incidental focus
+        // reassignment, e.g. on window close, goes through `setFocus` directly and does not reveal.
+        if !isFloating { nodeWorkspace?.revealStackWindow(self) }
+        return result
     }
 
     @MainActor func toLiveFocusOrNil() -> LiveFocus? { visualWorkspace.map { LiveFocus(windowOrNil: self, workspace: $0) } }
@@ -93,7 +98,12 @@ extension Workspace {
     func toLiveFocus() -> LiveFocus {
         // todo unfortunately mostRecentWindowRecursive may recursively reach empty rootTilingContainer
         //      while floating or macos unconventional windows might be presented
-        if let wd = mostRecentWindowRecursive ?? anyLeafWindowRecursive {
+        // Prefer a visible window: don't resurface a window hidden by `stack-windows-limit`
+        // just because the previously focused window went away.
+        let hidden = Set(tilingWindows.dropFirst().filter { $0.isStackHidden })
+        let preferred = mostRecentWindowRecursive.flatMap { hidden.contains($0) ? nil : $0 }
+            ?? allWindows.first { !hidden.contains($0) }
+        return if let wd = preferred ?? mostRecentWindowRecursive ?? anyLeafWindowRecursive {
             LiveFocus(windowOrNil: wd, workspace: self)
         } else {
             LiveFocus(windowOrNil: nil, workspace: self) // emptyWorkspace
