@@ -25,7 +25,10 @@ struct FocusCommand: Command {
                     return io.err("Can't find window with index \(index)")
                 }
             case .relative(let nextPrev):
-                let windows = target.workspace.allWindows
+                // Cycle only through the master and the visible stack: tiling windows, excluding
+                // both floating windows and windows hidden by `stack-windows-limit`.
+                target.workspace.enforceStackWindowsLimit()
+                let windows = target.workspace.tilingWindows.filter { !$0.isStackHidden }
                 guard let currentIndex = windows.firstIndex(where: { $0 == target.windowOrNil }) else {
                     return false
                 }

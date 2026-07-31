@@ -19,6 +19,7 @@ struct MoveNodeToMasterCommand: Command {
 
         let firstTilingIndex = workspace.children.firstIndex(where: { ($0 as? Window)?.isFloating == false }) ?? 0
 
+        window.isStackHidden = false // the master is always visible
         window.bind(to: workspace, index: firstTilingIndex)
         return true
     }

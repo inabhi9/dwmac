@@ -103,6 +103,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
     "default-root-container-orientation": Parser(\.defaultRootContainerOrientation, parseDefaultContainerOrientation),
     "master-position": Parser(\.masterPosition, parseMasterPosition),
+    "stack-windows-limit": Parser(\.stackWindowsLimit, parseStackWindowsLimit),
 
     "start-at-login": Parser(\.startAtLogin, parseBool),
     "automatically-unhide-macos-hidden-apps": Parser(\.automaticallyUnhideMacosHiddenApps, parseBool),
@@ -318,6 +319,11 @@ private func parseDefaultContainerOrientation(_ raw: TOMLValueConvertible, _ bac
         DefaultContainerOrientation(rawValue: $0)
             .orFailure(.semantic(backtrace, "Can't parse default container orientation '\($0)'"))
     }
+}
+
+private func parseStackWindowsLimit(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<Int> {
+    parseInt(raw, backtrace)
+        .filter(.semantic(backtrace, "Must be >= -1")) { $0 >= -1 }
 }
 
 private func parseMasterPosition(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<MasterPosition> {
