@@ -22,6 +22,7 @@ let subcommandDescriptions = [
     ["  macos-native-fullscreen", "Toggle macOS fullscreen for the focused window"],
     ["  macos-native-minimize", "Minimize focused window"],
     ["  mfact", "Set or adjust the master area factor (ratio) for master-stack layout."],
+    ["  minimize-all-windows-but-current", "On the focused workspace, minimize all windows but current, leaving the master window as is"],
     ["  mode", "Activate the specified binding mode"],
     ["  move-mouse", "Move mouse to the requested position"],
     ["  move-node-to-master", "Move the focused window to the master position (index 0) in the current tiling container."],

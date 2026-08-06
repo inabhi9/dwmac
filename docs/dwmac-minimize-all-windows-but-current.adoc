@@ -1,0 +1,33 @@
+= dwmac-minimize-all-windows-but-current(1)
+include::util/man-attributes.adoc[]
+:manname: dwmac-minimize-all-windows-but-current
+// tag::purpose[]
+:manpurpose: On the focused workspace, minimize all windows but current, leaving the master window as is
+// end::purpose[]
+
+// =========================================================== Synopsis
+== Synopsis
+[verse]
+// tag::synopsis[]
+dwmac minimize-all-windows-but-current [-h|--help]
+
+// end::synopsis[]
+
+// =========================================================== Description
+== Description
+
+// tag::body[]
+{manpurpose}
+
+Minimizes every stack window except the currently focused one, and every floating window
+except the currently focused one. The master window is left as is.
+
+// =========================================================== Options
+include::util/conditional-options-header.adoc[]
+
+-h, --help:: Print help
+
+// end::body[]
+
+// =========================================================== Footer
+include::util/man-footer.adoc[]

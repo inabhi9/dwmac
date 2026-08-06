@@ -49,6 +49,8 @@ extension CmdArgs {
                 command = MacosNativeMinimizeCommand(args: self as! MacosNativeMinimizeCmdArgs)
             case .mfact:
                 command = MfactCommand(args: self as! MfactCmdArgs)
+            case .minimizeAllWindowsButCurrent:
+                command = MinimizeAllWindowsButCurrentCommand(args: self as! MinimizeAllWindowsButCurrentCmdArgs)
             case .mode:
                 command = ModeCommand(args: self as! ModeCmdArgs)
             case .move:

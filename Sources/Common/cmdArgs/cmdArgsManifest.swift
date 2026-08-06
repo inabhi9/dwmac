@@ -25,6 +25,7 @@ public enum CmdKind: String, CaseIterable, Equatable, Sendable {
     case macosNativeFullscreen = "macos-native-fullscreen"
     case macosNativeMinimize = "macos-native-minimize"
     case mfact
+    case minimizeAllWindowsButCurrent = "minimize-all-windows-but-current"
     case mode
     case move = "move"
     case moveMouse = "move-mouse"
@@ -91,6 +92,8 @@ func initSubcommands() -> [String: any SubCommandParserProtocol] {
                 result[kind.rawValue] = SubCommandParser(MacosNativeMinimizeCmdArgs.init)
             case .mfact:
                 result[kind.rawValue] = SubCommandParser(parseMfactCmdArgs)
+            case .minimizeAllWindowsButCurrent:
+                result[kind.rawValue] = SubCommandParser(MinimizeAllWindowsButCurrentCmdArgs.init)
             case .mode:
                 result[kind.rawValue] = SubCommandParser(ModeCmdArgs.init)
             case .move:

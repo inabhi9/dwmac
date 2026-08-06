@@ -100,6 +100,13 @@ include::dwmac-mfact.adoc[tags=synopsis]
 include::dwmac-mfact.adoc[tags=purpose]
 include::dwmac-mfact.adoc[tags=body]
 
+== minimize-all-windows-but-current
+----
+include::dwmac-minimize-all-windows-but-current.adoc[tags=synopsis]
+----
+include::dwmac-minimize-all-windows-but-current.adoc[tags=purpose]
+include::dwmac-minimize-all-windows-but-current.adoc[tags=body]
+
 == mode
 ----
 include::dwmac-mode.adoc[tags=synopsis]

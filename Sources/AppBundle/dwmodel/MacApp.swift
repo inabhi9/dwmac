@@ -61,6 +61,11 @@ final class MacApp: AbstractApp {
             let thread = Thread {
                 $axTaskLocalAppThreadToken.withValue(AxAppThreadToken(pid: pid, idForDebug: nsApp.idForDebug)) {
                     let axApp = AXUIElementCreateApplication(nsApp.processIdentifier)
+                    // Without this, macOS falls back to its default AX messaging timeout (several
+                    // seconds), so a single app that's briefly unresponsive (e.g. right after one of
+                    // its windows closes or minimizes) stalls the whole refresh/layout pipeline, since
+                    // every AX call to this app (made from its dedicated thread) is otherwise unbounded.
+                    AXUIElementSetMessagingTimeout(axApp, axMessagingTimeoutSeconds)
                     let handlers: HandlerToNotifKeyMapping = [
                         (refreshObs, [kAXWindowCreatedNotification, kAXFocusedWindowChangedNotification]),
                     ]
@@ -273,6 +278,12 @@ final class MacApp: AbstractApp {
     }
 
     private func refreshAndGetAliveWindowIds(frontmostAppBundleId: String?) async throws -> [UInt32] {
+        // TEMP PERF DEBUG: remove once the reconciliation-delay root cause is found
+        let __t0 = Date()
+        defer {
+            let __dt = Date().timeIntervalSince(__t0)
+            if __dt > 0.05 { print("[dwmac-perf]     app '\(nsApp.idForDebug)' took \(__dt)s") }
+        }
         if nsApp.isTerminated {
             await destroy()
             return []

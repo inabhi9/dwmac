@@ -25,9 +25,15 @@ func runRefreshSessionBlocking(
     let state = signposter.beginInterval(#function, "event: \(event) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
     defer { signposter.endInterval(#function, state) }
     if !TrayMenuModel.shared.isEnabled { return }
+    // TEMP PERF DEBUG: remove once the reconciliation-delay root cause is found
+    let __perfStart = Date()
+    func __mark(_ label: String) {
+        print("[dwmac-perf] \(label): +\(Date().timeIntervalSince(__perfStart))s (event: \(event))")
+    }
     try await $refreshSessionEvent.withValue(event) {
         try await $_isStartup.withValue(event.isStartup) {
             let nativeFocused = try await getNativeFocusedWindow()
+            __mark("getNativeFocusedWindow")
             if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
             updateFocusCache(nativeFocused)
 
@@ -35,12 +41,15 @@ func runRefreshSessionBlocking(
 
             refreshModel()
             try await refresh()
+            __mark("refresh")
             gcMonitors()
 
             updateTrayText()
             SecureInputPanel.shared.refresh()
             try await normalizeLayoutReason()
+            __mark("normalizeLayoutReason")
             if shouldLayoutWorkspaces { try await layoutWorkspaces() }
+            __mark("layoutWorkspaces")
         }
     }
 }
@@ -103,8 +112,11 @@ func refreshModel() {
 
 @MainActor
 private func refresh() async throws {
+    // TEMP PERF DEBUG: remove once the reconciliation-delay root cause is found
+    let __t0 = Date()
     // Garbage collect terminated apps and windows before working with all windows
     let mapping = try await MacApp.refreshAllAndGetAliveWindowIds(frontmostAppBundleId: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+    print("[dwmac-perf]   refreshAllAndGetAliveWindowIds: \(Date().timeIntervalSince(__t0))s for \(mapping.count) apps")
     let aliveWindowIds = mapping.values.flatMap { $0 }.toSet()
 
     for window in MacWindow.allWindows {

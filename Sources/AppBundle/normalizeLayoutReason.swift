@@ -1,3 +1,5 @@
+import Foundation
+
 @MainActor
 func normalizeLayoutReason() async throws {
     for workspace in Workspace.all {
@@ -23,6 +25,12 @@ private func validateStillPopups() async throws {
 @MainActor
 private func _normalizeLayoutReason(workspace: Workspace, windows: [Window]) async throws {
     for window in windows {
+        // TEMP PERF DEBUG: remove once the reconciliation-delay root cause is found
+        let __t0 = Date()
+        defer {
+            let __dt = Date().timeIntervalSince(__t0)
+            if __dt > 0.05 { print("[dwmac-perf]     window \(window.windowId) (\(window.app.name ?? "?")) normalize took \(__dt)s") }
+        }
         let isMacosFullscreen = try await window.isMacosFullscreen
         let isMacosMinimized = try await (!isMacosFullscreen).andAsync { @MainActor @Sendable in try await window.isMacosMinimized }
         let isMacosWindowOfHiddenApp = !isMacosFullscreen && !isMacosMinimized &&

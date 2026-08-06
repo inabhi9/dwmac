@@ -87,6 +87,9 @@ let macos_native_minimize_help_generated = """
 let mfact_help_generated = """
     USAGE: mfact [-h|--help] [+|-]<number>
     """
+let minimize_all_windows_but_current_help_generated = """
+    USAGE: minimize-all-windows-but-current [-h|--help]
+    """
 let mode_help_generated = """
     USAGE: mode [-h|--help] <binding-mode>
     """
