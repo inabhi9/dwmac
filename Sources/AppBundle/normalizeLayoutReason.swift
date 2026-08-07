@@ -1,3 +1,5 @@
+import Foundation
+
 @MainActor
 func normalizeLayoutReason() async throws {
     for workspace in Workspace.all {
@@ -23,6 +25,12 @@ private func validateStillPopups() async throws {
 @MainActor
 private func _normalizeLayoutReason(workspace: Workspace, windows: [Window]) async throws {
     for window in windows {
+        // TEMP PERF DEBUG: remove once the reconciliation-delay root cause is found
+        let __t0 = Date()
+        defer {
+            let __dt = Date().timeIntervalSince(__t0)
+            if __dt > 0.05 { print("[dwmac-perf]     window \(window.windowId) (\(window.app.name ?? "?")) normalize took \(__dt)s") }
+        }
         let isMacosFullscreen = try await window.isMacosFullscreen
         let isMacosMinimized = try await (!isMacosFullscreen).andAsync { @MainActor @Sendable in try await window.isMacosMinimized }
         let isMacosWindowOfHiddenApp = !isMacosFullscreen && !isMacosMinimized &&
@@ -32,12 +40,15 @@ private func _normalizeLayoutReason(workspace: Workspace, windows: [Window]) asy
                 guard let parent = window.parent else { continue }
                 if isMacosFullscreen {
                     window.layoutReason = .macos(prevParentKind: parent.kind)
+                    window.isFloatingAutoHidden = false
                     window.bind(to: workspace.macOsNativeFullscreenWindowsContainer, index: INDEX_BIND_LAST)
                 } else if isMacosMinimized {
                     window.layoutReason = .macos(prevParentKind: parent.kind)
+                    window.isFloatingAutoHidden = false
                     window.bind(to: macosMinimizedWindowsContainer, index: INDEX_BIND_LAST)
                 } else if isMacosWindowOfHiddenApp {
                     window.layoutReason = .macos(prevParentKind: parent.kind)
+                    window.isFloatingAutoHidden = false
                     window.bind(to: workspace.macOsNativeHiddenAppsWindowsContainer, index: INDEX_BIND_LAST)
                 }
             case .macos(let prevParentKind):
@@ -51,6 +62,7 @@ private func _normalizeLayoutReason(workspace: Workspace, windows: [Window]) asy
 @MainActor
 func exitMacOsNativeUnconventionalState(window: Window, prevParentKind: NonLeafDwNodeKind, workspace: Workspace) async throws {
     window.layoutReason = .standard
+    window.isFloatingAutoHidden = false
 
     if window.isFloating {
         window.bindAsFloatingWindow(to: workspace)

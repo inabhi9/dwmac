@@ -20,6 +20,14 @@ final class TestWindow: Window, CustomStringConvertible {
 
     nonisolated var description: String { "TestWindow(\(windowId))" }
 
+    // Records the corner a window was hidden into (nil == currently tiled/visible).
+    private(set) var hiddenInCorner: OptimalHideCorner? = nil
+
+    @MainActor
+    override func hideInCorner(_ corner: OptimalHideCorner) async throws {
+        hiddenInCorner = corner
+    }
+
     @MainActor
     override func nativeFocus() {
         appForTests = TestApp.shared
@@ -40,7 +48,12 @@ final class TestWindow: Window, CustomStringConvertible {
         _rect
     }
 
+    @MainActor override func getAxSize() async throws -> CGSize? {
+        _rect?.size
+    }
+
     override func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) {
+        hiddenInCorner = nil // positioning on-screen unhides the window
         guard let old = _rect else { return }
         let newTopLeft = topLeft ?? old.topLeftCorner
         let newSize = size ?? old.size

@@ -76,13 +76,22 @@ struct FrozenFocus: AeroAny, Equatable, Sendable {
 }
 extension Window {
     @MainActor func focusWindow() -> Bool {
-        if let focus = toLiveFocusOrNil() {
-            return setFocus(to: focus)
-        } else {
+        guard let liveFocus = toLiveFocusOrNil() else {
             // todo We should also exit-native-hidden/unminimize[/exit-native-fullscreen?] window if we want to fix ID-B6E178F2
             //      and retry to focus the window. Otherwise, it's not possible to focus minimized/hidden windows
             return false
         }
+        let result = setFocus(to: liveFocus)
+        // Explicitly focusing a window hidden by `stack-windows-limit` brings it into view.
+        // This runs *after* setFocus so the window counts as focused while `revealStackWindow`
+        // re-applies the limit (the focused window is never hidden). Incidental focus
+        // reassignment, e.g. on window close, goes through `setFocus` directly and does not reveal.
+        if !isFloating {
+            nodeWorkspace?.revealStackWindow(self)
+        } else {
+            nodeWorkspace?.revealFloatingWindow(self)
+        }
+        return result
     }
 
     @MainActor func toLiveFocusOrNil() -> LiveFocus? { visualWorkspace.map { LiveFocus(windowOrNil: self, workspace: $0) } }
@@ -93,7 +102,12 @@ extension Workspace {
     func toLiveFocus() -> LiveFocus {
         // todo unfortunately mostRecentWindowRecursive may recursively reach empty rootTilingContainer
         //      while floating or macos unconventional windows might be presented
-        if let wd = mostRecentWindowRecursive ?? anyLeafWindowRecursive {
+        // Prefer a visible window: don't resurface a window hidden by `stack-windows-limit`
+        // just because the previously focused window went away.
+        let hidden = Set(tilingWindows.dropFirst().filter { $0.isStackHidden })
+        let preferred = mostRecentWindowRecursive.flatMap { hidden.contains($0) ? nil : $0 }
+            ?? allWindows.first { !hidden.contains($0) }
+        return if let wd = preferred ?? mostRecentWindowRecursive ?? anyLeafWindowRecursive {
             LiveFocus(windowOrNil: wd, workspace: self)
         } else {
             LiveFocus(windowOrNil: nil, workspace: self) // emptyWorkspace
@@ -128,6 +142,7 @@ extension Workspace {
     var hasFocusedWorkspaceChanged = false
     var hasFocusedMonitorChanged = false
     if frozenFocus != _lastKnownFocus {
+        updateFloatingAutoHide(oldFocus: _lastKnownFocus, newFocus: focus)
         _prevFocus = _lastKnownFocus
         hasFocusChanged = true
     }
@@ -152,6 +167,17 @@ extension Workspace {
     if hasFocusedMonitorChanged {
         onFocusedMonitorChanged(focus)
     }
+}
+
+/// `center-floating-windows` autohide: when focus moves away from a floating window, mark it
+/// autohidden so the next layout pass moves it off-screen (see `layoutFloatingWindow`). Only
+/// the window that actually lost focus is touched — never other floating windows.
+@MainActor private func updateFloatingAutoHide(oldFocus: FrozenFocus, newFocus: LiveFocus) {
+    guard config.centerFloatingWindows else { return }
+    guard let oldWindow = oldFocus.live.windowOrNil, oldWindow.isFloating else { return }
+    guard oldWindow != newFocus.windowOrNil else { return }
+    guard oldWindow.layoutReason == .standard else { return } // already minimized/fullscreen/macos-hidden — leave to that subsystem
+    oldWindow.isFloatingAutoHidden = true
 }
 
 @MainActor private func onFocusedMonitorChanged(_ focus: LiveFocus) {

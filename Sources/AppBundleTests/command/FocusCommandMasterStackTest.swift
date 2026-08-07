@@ -38,6 +38,37 @@ final class FocusCommandMasterStackTest: XCTestCase {
         assertEquals(focus.windowOrNil?.windowId, 1)
     }
 
+    func testFocusNextPrevSkipsHiddenWindowsWhenStackLimited() async throws {
+        config.stackWindowsLimit = 1
+        defer { config.stackWindowsLimit = -1 }
+
+        let workspace = Workspace.get(byName: name)
+        workspace.apply {
+            $0.layout = .masterStack
+            TestWindow.new(id: 1, parent: $0) // master (always visible)
+            TestWindow.new(id: 2, parent: $0) // visible stack (limit = 1)
+            TestWindow.new(id: 3, parent: $0) // hidden by the limit
+        }
+
+        _ = Window.get(byId: 1)?.focusWindow()
+        assertEquals(focus.windowOrNil?.windowId, 1)
+
+        // focus next -> stack (id 2); the hidden window (id 3) is skipped
+        try await FocusCommand.new(relative: .next).run(.defaultEnv, .emptyStdin)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+
+        // focus next -> wraps back to master (id 1), skipping the hidden id 3 (never revealed)
+        try await FocusCommand.new(relative: .next).run(.defaultEnv, .emptyStdin)
+        assertEquals(focus.windowOrNil?.windowId, 1)
+
+        // focus prev -> stack (id 2), still skipping the hidden id 3
+        try await FocusCommand.new(relative: .prev).run(.defaultEnv, .emptyStdin)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+
+        // The hidden window remains hidden by the limit.
+        XCTAssertTrue(workspace.stackLimitHiddenWindows.contains { $0.windowId == 3 })
+    }
+
     func testFocusNextPrevWrappingInMasterStack() async throws {
         let workspace = Workspace.get(byName: name)
         workspace.apply {

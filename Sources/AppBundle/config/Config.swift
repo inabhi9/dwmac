@@ -60,6 +60,15 @@ struct Config: ConvenienceCopyable {
     var onWindowDetected: [WindowDetectedCallback] = []
     var onModeChanged: [any Command] = []
     var masterPosition: MasterPosition = .left
+    // Maximum number of stacked (non-master) windows to tile.
+    // -1 means unlimited (all stacked windows are tiled).
+    //  0 means no stack: only the master is tiled and every other window is hidden
+    //    off-screen (monocle-like); a new window becomes the master.
+    // >0 limits the visible stack; windows beyond the limit are removed from the stack and
+    //    hidden off-screen. With `attach-below` a new window stays visible at the bottom of
+    //    the stack and pushes the oldest (topmost) window out; otherwise the oldest window
+    //    falls off the bottom.
+    var stackWindowsLimit: Int = -1
 }
 
 enum DefaultContainerOrientation: String {

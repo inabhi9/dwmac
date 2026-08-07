@@ -112,7 +112,7 @@ final class MacWindow: Window {
 
     // todo it's part of the window layout and should be moved to layoutRecursive.swift
     @MainActor
-    func hideInCorner(_ corner: OptimalHideCorner) async throws {
+    override func hideInCorner(_ corner: OptimalHideCorner) async throws {
         guard let nodeMonitor else { return }
         // Don't accidentally override prevUnhiddenEmulationPosition in case of subsequent
         // `hideEmulation` calls
@@ -221,6 +221,7 @@ private func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: M
 private func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> BindingData {
     window?.unbindFromParent()
     window?.isFloating = false
+    window?.isStackHidden = false // a freshly (re)added tiling window is visible
 
     return BindingData(
         parent: workspace,

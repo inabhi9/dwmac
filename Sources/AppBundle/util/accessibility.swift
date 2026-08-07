@@ -15,6 +15,13 @@ private func resetAccessibility() {
     _ = try? Process.run(URL(filePath: "/usr/bin/tccutil"), arguments: ["reset", "Accessibility", dwmacAppId])
 }
 
+/// Applied per-app via `AXUIElementSetMessagingTimeout` right after an app's AXUIElement is created.
+/// macOS's own default AX messaging timeout is several seconds, which is long enough for a single
+/// momentarily-unresponsive app (e.g. right after one of its windows closes/minimizes) to visibly
+/// stall the whole refresh/layout pipeline. 1 second is comfortably above a healthy round trip
+/// (usually well under 100ms) while capping the worst case far below the unbounded default.
+let axMessagingTimeoutSeconds: Float = 1
+
 protocol ReadableAttr: Sendable {
     associatedtype T
     var getter: @Sendable (AnyObject) -> T? { get }

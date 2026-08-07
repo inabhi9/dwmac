@@ -2,13 +2,13 @@ import AppKit
 
 extension Workspace {
     @MainActor
-    func layoutWorkspace() async throws {
+    func layoutWorkspace(hideCorner: OptimalHideCorner = .bottomRightCorner) async throws {
         if isEffectivelyEmpty { return }
         let rect = workspaceMonitor.visibleRectPaddedByOuterGaps
         let context = LayoutContext(self)
 
         // Layout tiling windows
-        try await layoutMasterStack(rect.topLeftCorner, width: rect.width, height: rect.height - 1, virtual: rect, context)
+        try await layoutMasterStack(rect.topLeftCorner, width: rect.width, height: rect.height - 1, virtual: rect, hideCorner: hideCorner, context)
 
         // Layout floating windows
         for window in children.filterIsInstance(of: Window.self).filter({ $0.isFloating }) {
@@ -19,24 +19,36 @@ extension Workspace {
     }
 
     @MainActor
-    private func layoutMasterStack(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
-        let windows = tilingWindows
-        if windows.isEmpty { return }
+    private func layoutMasterStack(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, hideCorner: OptimalHideCorner, _ context: LayoutContext) async throws {
+        if tilingWindows.isEmpty { return }
 
         if layout == .floating {
             return
         }
 
-        if windows.count == 1 {
-            let window = windows[0]
-            try await layoutWindow(window, point, width, height, virtual, context)
-            return
-        }
+        // Bring the sticky hidden flags up to date with the current window set (only ever hides
+        // the oldest overflowing windows; never resurfaces a hidden one).
+        enforceStackWindowsLimit()
+
+        let resolved = stackLimitResolution
+        guard let master = resolved.master else { return }
 
         let gaps = context.resolvedGaps.inner
         let gapH = CGFloat(gaps.horizontal)
         let gapV = CGFloat(gaps.vertical)
 
+        // Monocle case: no stack is tiled (either there is a single window, or the stack
+        // limit is 0). The master fills the whole area and every other window is removed
+        // from the layout and hidden off-screen.
+        if resolved.visibleStack.isEmpty {
+            try await layoutWindow(master, point, width, height, virtual, context)
+            for window in resolved.hidden {
+                try await window.hideInCorner(hideCorner)
+            }
+            return
+        }
+
+        let visibleStackCount = resolved.visibleStack.count
         let masterWidth: CGFloat
         let masterHeight: CGFloat
         let stackWidth: CGFloat
@@ -46,11 +58,11 @@ extension Workspace {
             masterWidth = (width - gapH) * mfact
             masterHeight = height
             stackWidth = width - masterWidth - gapH
-            stackHeight = (height - CGFloat(windows.count - 2) * gapV) / CGFloat(windows.count - 1)
+            stackHeight = (height - CGFloat(visibleStackCount - 1) * gapV) / CGFloat(visibleStackCount)
         } else {
             masterWidth = width
             masterHeight = (height - gapV) * mfact
-            stackWidth = (width - CGFloat(windows.count - 2) * gapH) / CGFloat(windows.count - 1)
+            stackWidth = (width - CGFloat(visibleStackCount - 1) * gapH) / CGFloat(visibleStackCount)
             stackHeight = height - masterHeight - gapV
         }
 
@@ -70,17 +82,23 @@ extension Workspace {
             stackOrigin = point.addingYOffset(masterHeight + gapV)
         }
 
-        // Master window (first in list)
-        try await layoutWindow(windows[0], masterOrigin, masterWidth, masterHeight, virtual, context)
+        func stackSlotPoint(_ slot: Int) -> CGPoint {
+            orientation == .h
+                ? stackOrigin.addingYOffset(CGFloat(slot) * (stackHeight + gapV))
+                : stackOrigin.addingXOffset(CGFloat(slot) * (stackWidth + gapH))
+        }
 
-        // Stack windows
-        for i in 1 ..< windows.count {
-            let stackPoint: CGPoint = if orientation == .h {
-                stackOrigin.addingYOffset(CGFloat(i - 1) * (stackHeight + gapV))
-            } else {
-                stackOrigin.addingXOffset(CGFloat(i - 1) * (stackWidth + gapH))
-            }
-            try await layoutWindow(windows[i], stackPoint, stackWidth, stackHeight, virtual, context)
+        // Master window (first in list)
+        try await layoutWindow(master, masterOrigin, masterWidth, masterHeight, virtual, context)
+
+        // Visible stack windows (up to the configured limit)
+        for (slot, window) in resolved.visibleStack.enumerated() {
+            try await layoutWindow(window, stackSlotPoint(slot), stackWidth, stackHeight, virtual, context)
+        }
+
+        // Windows beyond the limit are hidden off-screen instead of covering a tiled window.
+        for window in resolved.hidden {
+            try await window.hideInCorner(hideCorner)
         }
     }
 
@@ -104,6 +122,16 @@ extension Workspace {
     }
 }
 
+/// A point guaranteed to sit outside every monitor's bounds, used to park autohidden floating
+/// windows off-screen without disturbing their captured "unhidden" position (unlike
+/// `hideInCorner`, which is swept and restored every refresh by `layoutWorkspaces`).
+@MainActor
+private var offscreenHidePoint: CGPoint {
+    let maxX = monitors.map(\.rect.maxX).max() ?? 0
+    let maxY = monitors.map(\.rect.maxY).max() ?? 0
+    return CGPoint(x: maxX + 10000, y: maxY + 10000)
+}
+
 private struct LayoutContext {
     let workspace: Workspace
     let resolvedGaps: ResolvedGaps
@@ -120,6 +148,14 @@ extension Window {
     fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
         let workspace = context.workspace
         let targetMonitor = workspace.workspaceMonitor
+
+        if isFloatingAutoHidden {
+            if windowId != currentlyManipulatedWithMouseWindowId {
+                setAxFrame(offscreenHidePoint, nil)
+            }
+            lastLayoutMonitor = targetMonitor
+            return
+        }
 
         if config.centerFloatingWindows && windowId != currentlyManipulatedWithMouseWindowId {
             if let windowSize = try await getAxSize() ?? lastFloatingSize {
