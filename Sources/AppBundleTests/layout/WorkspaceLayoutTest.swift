@@ -351,4 +351,74 @@ final class WorkspaceLayoutTest: XCTestCase {
         XCTAssertNotNil(oldest.hiddenInCorner)
         XCTAssertEqual(newest.lastAppliedLayoutPhysicalRect?.width, 1920) // promoted master fills screen
     }
+
+    func testFloatingWindowAutohidesOnFocusLossAndReappearsWhenFocused() async throws {
+        config.centerFloatingWindows = true
+        defer { config.centerFloatingWindows = false }
+
+        let workspace = Workspace.get(byName: name)
+        let rect = Rect(topLeftX: 0, topLeftY: 0, width: 100, height: 100)
+        let tiling = TestWindow.new(id: 1, parent: workspace, rect: rect)
+        let floating = TestWindow.new(id: 2, parent: workspace, rect: rect)
+        floating.bindAsFloatingWindow(to: workspace)
+        floating.lastFloatingSize = CGSize(width: 100, height: 100)
+
+        let monitorRect = workspace.workspaceMonitor.visibleRect
+        let centeredTopLeft = CGPoint(
+            x: monitorRect.topLeftX + (monitorRect.width - 100) / 2,
+            y: monitorRect.topLeftY + (monitorRect.height - 100) / 2,
+        )
+
+        // Focusing the floating window keeps it visible and centered.
+        _ = floating.focusWindow()
+        checkOnFocusChangedCallbacks()
+        try await workspace.layoutWorkspace()
+        XCTAssertFalse(floating.isFloatingAutoHidden)
+        var floatingRect = try await floating.getAxRect()
+        XCTAssertEqual(floatingRect?.topLeftX, centeredTopLeft.x)
+        XCTAssertEqual(floatingRect?.topLeftY, centeredTopLeft.y)
+
+        // Moving focus away hides it off-screen; it must not be resurfaced by layout alone.
+        _ = tiling.focusWindow()
+        checkOnFocusChangedCallbacks()
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(floating.isFloatingAutoHidden)
+        floatingRect = try await floating.getAxRect()
+        XCTAssertNotEqual(floatingRect?.topLeftX, centeredTopLeft.x)
+        try await workspace.layoutWorkspace() // a second pass must not bring it back either
+        XCTAssertTrue(floating.isFloatingAutoHidden)
+
+        // Explicitly focusing it again reveals and recenters it.
+        _ = floating.focusWindow()
+        checkOnFocusChangedCallbacks()
+        try await workspace.layoutWorkspace()
+        XCTAssertFalse(floating.isFloatingAutoHidden)
+        floatingRect = try await floating.getAxRect()
+        XCTAssertEqual(floatingRect?.topLeftX, centeredTopLeft.x)
+        XCTAssertEqual(floatingRect?.topLeftY, centeredTopLeft.y)
+    }
+
+    func testClosingAutohiddenFloatingWindowDoesNotCrash() async throws {
+        config.centerFloatingWindows = true
+        defer { config.centerFloatingWindows = false }
+
+        let workspace = Workspace.get(byName: name)
+        let rect = Rect(topLeftX: 0, topLeftY: 0, width: 100, height: 100)
+        let tiling = TestWindow.new(id: 1, parent: workspace, rect: rect)
+        let floating = TestWindow.new(id: 2, parent: workspace, rect: rect)
+        floating.bindAsFloatingWindow(to: workspace)
+        floating.lastFloatingSize = CGSize(width: 100, height: 100)
+
+        _ = floating.focusWindow()
+        checkOnFocusChangedCallbacks()
+        _ = tiling.focusWindow()
+        checkOnFocusChangedCallbacks()
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(floating.isFloatingAutoHidden)
+
+        // Closing an autohidden floating window is unrelated bookkeeping; it must just unbind.
+        floating.closeAxWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertFalse(workspace.floatingWindows.contains(floating))
+    }
 }

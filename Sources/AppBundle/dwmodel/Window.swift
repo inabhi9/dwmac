@@ -14,6 +14,10 @@ open class Window: DwNode, Hashable {
     // Once set it stays hidden (even when other windows are removed) until the window is
     // explicitly focused or re-added. See `Workspace.enforceStackWindowsLimit`.
     var isStackHidden: Bool = false
+    // Sticky flag: this floating window is hidden off-screen because it lost focus
+    // (`center-floating-windows` autohide behavior). Stays hidden until explicitly
+    // focused via `focusWindow()`. See `Workspace.revealFloatingWindow`.
+    var isFloatingAutoHidden: Bool = false
 
     @MainActor
     init(id: UInt32, _ app: any AbstractApp, lastFloatingSize: CGSize?, parent: NonLeafDwNodeObject, index: Int) {

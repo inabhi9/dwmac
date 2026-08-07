@@ -122,6 +122,16 @@ extension Workspace {
     }
 }
 
+/// A point guaranteed to sit outside every monitor's bounds, used to park autohidden floating
+/// windows off-screen without disturbing their captured "unhidden" position (unlike
+/// `hideInCorner`, which is swept and restored every refresh by `layoutWorkspaces`).
+@MainActor
+private var offscreenHidePoint: CGPoint {
+    let maxX = monitors.map(\.rect.maxX).max() ?? 0
+    let maxY = monitors.map(\.rect.maxY).max() ?? 0
+    return CGPoint(x: maxX + 10000, y: maxY + 10000)
+}
+
 private struct LayoutContext {
     let workspace: Workspace
     let resolvedGaps: ResolvedGaps
@@ -138,6 +148,14 @@ extension Window {
     fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
         let workspace = context.workspace
         let targetMonitor = workspace.workspaceMonitor
+
+        if isFloatingAutoHidden {
+            if windowId != currentlyManipulatedWithMouseWindowId {
+                setAxFrame(offscreenHidePoint, nil)
+            }
+            lastLayoutMonitor = targetMonitor
+            return
+        }
 
         if config.centerFloatingWindows && windowId != currentlyManipulatedWithMouseWindowId {
             if let windowSize = try await getAxSize() ?? lastFloatingSize {

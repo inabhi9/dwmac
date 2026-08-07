@@ -96,6 +96,14 @@ extension Workspace {
         enforceStackWindowsLimit()
     }
 
+    /// Explicitly reveals a floating window autohidden by `center-floating-windows` on focus
+    /// loss. The next layout pass recenters it (see `layoutFloatingWindow`).
+    @MainActor
+    func revealFloatingWindow(_ window: Window) {
+        guard window.isFloatingAutoHidden, window.nodeWorkspace === self else { return }
+        window.isFloatingAutoHidden = false
+    }
+
     @MainActor var macOsNativeFullscreenWindowsContainer: MacosFullscreenWindowsContainer {
         let containers = children.filterIsInstance(of: MacosFullscreenWindowsContainer.self)
         return switch containers.count {

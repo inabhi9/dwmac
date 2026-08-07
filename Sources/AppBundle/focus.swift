@@ -86,7 +86,11 @@ extension Window {
         // This runs *after* setFocus so the window counts as focused while `revealStackWindow`
         // re-applies the limit (the focused window is never hidden). Incidental focus
         // reassignment, e.g. on window close, goes through `setFocus` directly and does not reveal.
-        if !isFloating { nodeWorkspace?.revealStackWindow(self) }
+        if !isFloating {
+            nodeWorkspace?.revealStackWindow(self)
+        } else {
+            nodeWorkspace?.revealFloatingWindow(self)
+        }
         return result
     }
 
@@ -138,6 +142,7 @@ extension Workspace {
     var hasFocusedWorkspaceChanged = false
     var hasFocusedMonitorChanged = false
     if frozenFocus != _lastKnownFocus {
+        updateFloatingAutoHide(oldFocus: _lastKnownFocus, newFocus: focus)
         _prevFocus = _lastKnownFocus
         hasFocusChanged = true
     }
@@ -162,6 +167,17 @@ extension Workspace {
     if hasFocusedMonitorChanged {
         onFocusedMonitorChanged(focus)
     }
+}
+
+/// `center-floating-windows` autohide: when focus moves away from a floating window, mark it
+/// autohidden so the next layout pass moves it off-screen (see `layoutFloatingWindow`). Only
+/// the window that actually lost focus is touched — never other floating windows.
+@MainActor private func updateFloatingAutoHide(oldFocus: FrozenFocus, newFocus: LiveFocus) {
+    guard config.centerFloatingWindows else { return }
+    guard let oldWindow = oldFocus.live.windowOrNil, oldWindow.isFloating else { return }
+    guard oldWindow != newFocus.windowOrNil else { return }
+    guard oldWindow.layoutReason == .standard else { return } // already minimized/fullscreen/macos-hidden — leave to that subsystem
+    oldWindow.isFloatingAutoHidden = true
 }
 
 @MainActor private func onFocusedMonitorChanged(_ focus: LiveFocus) {

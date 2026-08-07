@@ -48,6 +48,10 @@ final class TestWindow: Window, CustomStringConvertible {
         _rect
     }
 
+    @MainActor override func getAxSize() async throws -> CGSize? {
+        _rect?.size
+    }
+
     override func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) {
         hiddenInCorner = nil // positioning on-screen unhides the window
         guard let old = _rect else { return }
